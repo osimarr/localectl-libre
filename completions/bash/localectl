@@ -1,0 +1,186 @@
+# bash completion for localectl
+# Install to: /usr/share/bash-completion/completions/localectl
+
+_localectl_complete_subcommands() {
+    COMPREPLY=( $(compgen -W "status set-locale list-locales set-keymap list-keymaps set-x11-keymap list-x11-keymap-models list-x11-keymap-layouts list-x11-keymap-variants list-x11-keymap-options" -- "$1") )
+}
+
+_localectl_complete_global_opts() {
+    COMPREPLY=( $(compgen -W "--no-convert --no-ask-password -h --help" -- "$1") )
+}
+
+_localectl_complete_locales() {
+    local cur="$1"
+    local list
+
+    if command -v locale >/dev/null 2>&1; then
+        list="$(locale -a 2>/dev/null)"
+        COMPREPLY=( $(compgen -W "$list" -- "$cur") )
+    fi
+}
+
+_localectl_complete_keymaps() {
+    local cur="$1"
+    local list
+
+    if command -v localectl >/dev/null 2>&1; then
+        list="$(localectl list-keymaps 2>/dev/null)"
+        COMPREPLY=( $(compgen -W "$list" -- "$cur") )
+    fi
+}
+
+_localectl_complete_x11_layouts() {
+    local cur="$1"
+    local list
+
+    if command -v localectl >/dev/null 2>&1; then
+        list="$(localectl list-x11-keymap-layouts 2>/dev/null)"
+        COMPREPLY=( $(compgen -W "$list" -- "$cur") )
+    fi
+}
+
+_localectl_complete_x11_models() {
+    local cur="$1"
+    local list
+
+    if command -v localectl >/dev/null 2>&1; then
+        list="$(localectl list-x11-keymap-models 2>/dev/null)"
+        COMPREPLY=( $(compgen -W "$list" -- "$cur") )
+    fi
+}
+
+_localectl_complete_x11_variants() {
+    local cur="$1"
+    local layout="$2"
+    local list
+
+    if command -v localectl >/dev/null 2>&1; then
+        if [[ -n "$layout" ]]; then
+            list="$(localectl list-x11-keymap-variants "$layout" 2>/dev/null)"
+        else
+            list="$(localectl list-x11-keymap-variants 2>/dev/null)"
+        fi
+        COMPREPLY=( $(compgen -W "$list" -- "$cur") )
+    fi
+}
+
+_localectl_complete_x11_options() {
+    local cur="$1"
+    local list
+
+    if command -v localectl >/dev/null 2>&1; then
+        list="$(localectl list-x11-keymap-options 2>/dev/null)"
+        COMPREPLY=( $(compgen -W "$list" -- "$cur") )
+    fi
+}
+
+_localectl() {
+    local cur prev cword subcmd
+    COMPREPLY=()
+
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    cword="$COMP_CWORD"
+
+    # Global options can be completed at any point.
+    if [[ "$cur" == -* ]]; then
+        _localectl_complete_global_opts "$cur"
+        return 0
+    fi
+
+    # Determine subcommand (first non-option token after command name).
+    subcmd=""
+    local i
+    for (( i=1; i<${#COMP_WORDS[@]}; i++ )); do
+        case "${COMP_WORDS[i]}" in
+            --no-convert|--no-ask-password)
+                ;;
+            -*)
+                ;;
+            *)
+                subcmd="${COMP_WORDS[i]}"
+                break
+                ;;
+        esac
+    done
+
+    # No subcommand yet: complete subcommands.
+    if [[ -z "$subcmd" ]]; then
+        _localectl_complete_subcommands "$cur"
+        return 0
+    fi
+
+    case "$subcmd" in
+        status|list-locales|list-keymaps|list-x11-keymap-models|list-x11-keymap-layouts|list-x11-keymap-options)
+            # These subcommands do not have positional arguments.
+            ;;
+
+        set-locale)
+            # Complete locale names for each locale argument.
+            _localectl_complete_locales "$cur"
+            ;;
+
+        set-keymap)
+            # set-keymap MAP [TOGGLEMAP]
+            if (( cword >= 2 )); then
+                _localectl_complete_keymaps "$cur"
+            fi
+            ;;
+
+        set-x11-keymap)
+            # set-x11-keymap LAYOUT [MODEL [VARIANT [OPTIONS]]]
+            local layout=""
+            local model=""
+            local variant=""
+            local args=()
+
+            # Gather positional args after subcommand (ignore global options).
+            local j
+            for (( j=1; j<${#COMP_WORDS[@]}; j++ )); do
+                case "${COMP_WORDS[j]}" in
+                    "$subcmd")
+                        continue
+                        ;;
+                    --no-convert|--no-ask-password)
+                        continue
+                        ;;
+                    -*)
+                        continue
+                        ;;
+                    *)
+                        args+=("${COMP_WORDS[j]}")
+                        ;;
+                esac
+            done
+
+            # args[0] is subcommand itself.
+            layout="${args[1]:-}"
+            model="${args[2]:-}"
+            variant="${args[3]:-}"
+
+            if [[ -z "$layout" || "$prev" == "$subcmd" ]]; then
+                _localectl_complete_x11_layouts "$cur"
+            elif [[ -z "$model" || "$prev" == "$layout" ]]; then
+                _localectl_complete_x11_models "$cur"
+            elif [[ -z "$variant" || "$prev" == "$model" ]]; then
+                _localectl_complete_x11_variants "$cur" "$layout"
+            else
+                _localectl_complete_x11_options "$cur"
+            fi
+            ;;
+
+        list-x11-keymap-variants)
+            # list-x11-keymap-variants [LAYOUT]
+            _localectl_complete_x11_layouts "$cur"
+            ;;
+
+        *)
+            # Unknown token in subcommand position: suggest subcommands.
+            _localectl_complete_subcommands "$cur"
+            ;;
+    esac
+
+    return 0
+}
+
+complete -F _localectl localectl
