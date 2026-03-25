@@ -1,0 +1,11 @@
+[package]
+name = "localectl"
+version = "0.1.0"
+edition = "2021"
+authors = ["David Cohen <dacohen@pm.me>"]
+description = "A replacement for systemd's localectl, for non-systemd systems"
+license = "GPL-2.0+"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+zbus = { version = "5", default-features = true, features = ["blocking"] }
