@@ -1,0 +1,56 @@
+name: Rust Build and Clippy
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Build and lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets
+
+  check-artix:
+    name: Build and lint (Artix container)
+    runs-on: ubuntu-latest
+    container: artixlinux/artixlinux:base
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install toolchain and build deps
+        run: |
+          pacman -Syu --noconfirm --needed
+          pacman -S --noconfirm --needed ca-certificates base-devel rustup
+          rustup toolchain install stable
+          rustup component add clippy
+
+      - name: Build
+        run: cargo build
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets
